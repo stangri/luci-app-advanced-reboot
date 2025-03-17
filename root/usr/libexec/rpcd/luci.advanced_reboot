@@ -46,7 +46,7 @@ alt_partition_unmount() {
 		fi
 		ubi_mtd="$(cat /sys/devices/virtual/ubi/ubi${i}/mtd_num)"
 		if [ -n "$ubi_mtd" ] && [ "$ubi_mtd" = "$op_ubi" ]; then
-			ubiblock --remove /dev/ubi${i}_${ubi_vol}
+			ubiblock --remove "/dev/ubi${i}_${ubi_vol}"
 			ubidetach -m "$op_ubi"
 			rm -rf /var/alt_rom
 		fi
@@ -71,6 +71,7 @@ get_alt_partition_os_info(){
 	alt_partition_unmount "$op_ubi" "$ubi_vol"
 	alt_partition_mount "$op_ubi" "$ubi_vol"
 	if [ -s "/var/alt_rom/etc/os-release" ]; then
+# shellcheck disable=SC2031
 		op_info="$(. /var/alt_rom/etc/os-release && echo "$PRETTY_NAME")"
 		if [ "${op_info//SNAPSHOT}" != "$op_info" ]; then
 			op_info="$(. /var/alt_rom/etc/os-release && echo "${OPENWRT_RELEASE%%-*}")"
@@ -193,12 +194,12 @@ obtain_device_info(){
 		opOffset="${opOffset:-1}"
 		ubiVolume="${ubiVolume:-0}"
 		if [ "$current_partition" = "$bootEnv1Partition1Value" ]; then
-			op_ubi=$(( ${partition2MTD:3:3} + $opOffset ))
+			op_ubi=$(( ${partition2MTD:3:3} + "$opOffset" ))
 		else
-			op_ubi=$(( ${partition1MTD:3:3} + $opOffset ))
+			op_ubi=$(( ${partition1MTD:3:3} + "$opOffset" ))
 		fi
-		cp_info="$(get_main_partition_os_info $op_ubi)"
-		op_info="$(get_alt_partition_os_info $op_ubi $vendorName $ubiVolume)"
+		cp_info="$(get_main_partition_os_info "$op_ubi")"
+		op_info="$(get_alt_partition_os_info "$op_ubi" "$vendorName" "$ubiVolume")"
 		if [ "$current_partition" = "$bootEnv1Partition1Value" ]; then
 			p1_os="${cp_info:-$p1_os}"
 			p2_os="${op_info:-$p2_os}"
