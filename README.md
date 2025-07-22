@@ -1,3 +1,3 @@
 # README
 
-Documentation for this project is available at [https://docs.openwrt.melmac.net/luci-app-advanced-reboot/](https://docs.openwrt.melmac.net/luci-app-advanced-reboot/).
+Documentation for this project is available at [https://docs.openwrt.melmac.ca/luci-app-advanced-reboot/](https://docs.openwrt.melmac.ca/luci-app-advanced-reboot/).
