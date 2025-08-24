@@ -10,8 +10,8 @@
     "params": [
       "bootpartition"
     ],
-    "get": "fw_printenv",
-    "set": "fw_setenv",
+    "get": "fw_printsys",
+    "set": "fw_setsys",
     "save": null
   },
   "partitions": [
