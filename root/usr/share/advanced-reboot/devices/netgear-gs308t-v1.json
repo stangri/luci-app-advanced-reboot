@@ -1,14 +1,14 @@
 {
   "device": {
-    "vendor": "Linksys",
-    "model": "MX4200v1",
+    "vendor": "Netgear",
+    "model": "GS308T v1",
     "board": [
-      "linksys,mx4200v1"
+      "netgear,gs308t-v1"
     ]
   },
   "commands": {
     "params": [
-      "boot_part"
+      "bootpartition"
     ],
     "get": "fw_printenv",
     "set": "fw_setenv",
@@ -18,18 +18,18 @@
     {
       "number": 1,
       "param_values": [
-        1
+        0
       ],
-      "mtd": "mtd21",
-      "labelOffsetBytes": 192
+      "mtd": "mtd6",
+      "labelOffsetBytes": null
     },
     {
       "number": 2,
       "param_values": [
-        2
+        1
       ],
-      "mtd": "mtd23",
-      "labelOffsetBytes": 192
+      "mtd": "mtd9",
+      "labelOffsetBytes": null
     }
   ]
 }

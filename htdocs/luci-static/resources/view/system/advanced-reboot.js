@@ -43,6 +43,18 @@ return view.extend({
 				args[1]
 			);
 		},
+		NO_BOARD_NAME: function (args) {
+			return _("Unable to read board name from /tmp/sysinfo/board_name.");
+		},
+		BOARD_NAME_MATCH_FILE_READ: function (args) {
+			var b = args && args[0] ? args[0] : "";
+			return _("Error accessing the device definition for board: %s").format(b);
+		},
+		NO_BOARD_NAME_MATCH: function (args) {
+			var b = args && args[0] ? args[0] : "";
+			/* This entry is unused in generic error banner; we render a dedicated warning below. */
+			return _("Unknown or unsupported dual-partition device: %s").format(b);
+		},
 	},
 
 	callReboot: rpc.declare({
@@ -52,13 +64,13 @@ return view.extend({
 	}),
 
 	callObtainDeviceInfo: rpc.declare({
-		object: "luci.advanced_reboot",
+		object: "luci.advanced-reboot",
 		method: "obtain_device_info",
 		expect: {},
 	}),
 
 	callTogglePartition: rpc.declare({
-		object: "luci.advanced_reboot",
+		object: "luci.advanced-reboot",
 		method: "toggle_boot_partition",
 		expect: {},
 	}),
@@ -242,27 +254,32 @@ return view.extend({
 		);
 	},
 
-	parsePartitions: function (partitions) {
+	parsePartitions: function (partitions, activeNumber) {
 		var res = [];
+		var active = activeNumber != null ? String(activeNumber) : null;
 
-		partitions.forEach(
+		(partitions || []).forEach(
 			L.bind(function (partition) {
-				var func, text;
+				var isActive = active != null && String(partition.number) === active;
+				var func = isActive ? "handleReboot" : "handleAlternativeReboot";
+				var status = isActive ? _("Current") : _("Alternative");
+				var text = isActive
+					? _("Reboot to current partition")
+					: _("Reboot to this partition...");
 
-				if (partition.state == "Current") {
-					func = "handleReboot";
-					text = _("Reboot to current partition");
-				} else {
-					func = "handleAlternativeReboot";
-					text = _("Reboot to alternative partition...");
-				}
+				var fwLabel = partition.label || _("Unknown");
+				fwLabel +=
+					partition.os && partition.os != ""
+						? " (Linux " + partition.os + ")"
+						: "";
 
 				res.push([
-					(partition.number + 0x100).toString(16).substr(-2).toUpperCase(),
-					_(partition.state),
-					partition.os
-						.replace("Unknown", _("Unknown"))
-						.replace("Compressed", _("Compressed")),
+					(Number(partition.number || 0) + 0x100)
+						.toString(16)
+						.substr(-2)
+						.toUpperCase(),
+					status,
+					fwLabel,
 					E(
 						"button",
 						{
@@ -293,6 +310,17 @@ return view.extend({
 
 		var body = E([E("h2", _("Advanced Reboot"))]);
 
+		var device_name = "";
+		var active_num = null;
+		var partitions = [];
+		if (device_info && device_info.device && device_info.partitions) {
+			var d = device_info.device;
+			device_name = [d.vendor || "", d.model || ""].filter(Boolean).join(" ");
+			active_num =
+				d.partition_active != null ? String(d.partition_active) : null;
+			partitions = device_info.partitions || [];
+		}
+
 		for (var config in changes || {}) {
 			body.appendChild(
 				E(
@@ -304,19 +332,54 @@ return view.extend({
 			break;
 		}
 
-		if (device_info.error)
-			body.appendChild(
-				E(
-					"p",
-					{ class: "alert-message warning" },
-					_("ERROR: ") + this.translateTable[device_info.error]()
-				)
-			);
+		/* Error handling */
+		if (device_info && device_info.error) {
+			if (device_info.error === "NO_BOARD_NAME_MATCH") {
+				var warnBoard = device_info.rom_board_name || "";
+				body.appendChild(
+					E(
+						"p",
+						{ class: "alert-message warning" },
+						_(
+							"Warning: Device (%s) is unknown or isn't a dual-firmware device!" +
+								"%s" +
+								"If you are seeing this on an OpenWrt dual-firmware supported device," +
+								"%s" +
+								"please refer to " +
+								"%sHow to add a new device section of the README%s."
+						).format(
+							warnBoard,
+							"<br /><br />",
+							"<br />",
+							'<a href="' +
+								pkg.URL +
+								'#how-to-add-a-new-device" target="_blank">',
+							"</a>"
+						)
+					)
+				);
+			} else {
+				var err = device_info.error;
+				var fn = this.translateTable[err];
+				var args = [];
+				if (device_info.rom_board_name) args = [device_info.rom_board_name];
+				if (typeof fn === "function") {
+					body.appendChild(
+						E("p", { class: "alert-message warning" }, _("ERROR: ") + fn(args))
+					);
+				}
+			}
+		}
 
-		body.appendChild(
-			E("h3", (device_info.device_name || "") + _(" Partitions"))
-		);
-		if (device_info.device_name) {
+		body.appendChild(E("h3", (device_name || "") + _(" Partitions")));
+
+		if (
+			device_info &&
+			device_info.device &&
+			Array.isArray(partitions) &&
+			partitions.length
+		) {
+			/* render table as before */
 			var partitions_table = E("table", { class: "table" }, [
 				E("tr", { class: "tr table-titles" }, [
 					E("th", { class: "th" }, [_("Partition")]),
@@ -328,33 +391,17 @@ return view.extend({
 
 			cbi_update_table(
 				partitions_table,
-				this.parsePartitions(device_info.partitions)
+				this.parsePartitions(partitions, active_num)
 			);
 
 			body.appendChild(partitions_table);
-		} else {
+		} else if (!device_info || !device_info.error) {
+			/* no partitions and no explicit error */
 			body.appendChild(
 				E(
 					"p",
 					{ class: "alert-message warning" },
-					device_info.rom_board_name
-						? _(
-								"Warning: Device (%s) is unknown or isn't a dual-firmware device!" +
-									"%s" +
-									"If you are seeing this on an OpenWrt dual-firmware supported device," +
-									"%s" +
-									"please refer to " +
-									"%sHow to add a new device section of the README%s."
-						  ).format(
-								device_info.rom_board_name,
-								"<br /><br />",
-								"<br />",
-								'<a href="' +
-									pkg.URL +
-									'#how-to-add-a-new-device" target="_blank">',
-								"</a>"
-						  )
-						: _("Warning: Unable to obtain device information!")
+					_("Warning: Unable to obtain device information!")
 				)
 			);
 		}
