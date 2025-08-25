@@ -43,9 +43,6 @@ return view.extend({
 				args[1]
 			);
 		},
-		NO_BOARD_NAME: function (args) {
-			return _("Unable to read board name from /tmp/sysinfo/board_name.");
-		},
 		BOARD_NAME_MATCH_FILE_READ: function (args) {
 			var b = args && args[0] ? args[0] : "";
 			return _("Error accessing the device definition for board: %s").format(b);
@@ -54,6 +51,22 @@ return view.extend({
 			var b = args && args[0] ? args[0] : "";
 			/* This entry is unused in generic error banner; we render a dedicated warning below. */
 			return _("Unknown or unsupported dual-partition device: %s").format(b);
+		},
+		INVALID_ARG: function (args) {
+			var d = args && args[0] ? args[0] : _("invalid argument");
+			return _("Invalid request: %s.").format(d);
+		},
+		PARTITION_NOT_FOUND: function (args) {
+			var n = args && args[0] ? args[0] : "?";
+			return _("Partition %s was not found in the device definition.").format(
+				n
+			);
+		},
+		ERR_SAVE_ENV: function (args) {
+			return _("Unable to save environment changes.");
+		},
+		NO_TARGET_FLAG: function (args) {
+			return _("Target partition flag is not defined for this device.");
 		},
 	},
 
@@ -69,9 +82,10 @@ return view.extend({
 		expect: {},
 	}),
 
-	callTogglePartition: rpc.declare({
+	callBootPartition: rpc.declare({
 		object: "luci.advanced-reboot",
-		method: "toggle_boot_partition",
+		method: "boot_partition",
+		params: ["number"],
 		expect: {},
 	}),
 
@@ -202,31 +216,43 @@ return view.extend({
 		);
 	},
 
-	handleAlternativeReboot: function (ev) {
-		return Promise.all([
-			L.resolveDefault(fs.stat("/usr/sbin/fw_printenv"), null),
-			L.resolveDefault(fs.stat("/usr/sbin/fw_setenv"), null),
-		]).then(
-			L.bind(function (data) {
-				if (!data[0] || !data[1]) {
-					return ui.addNotification(
-						null,
-						E("p", _("No access to fw_printenv or fw_printenv!"))
-					);
-				}
+	handleAlternativeReboot: function () {
+		// accept either (ev, number) or (number, ev)
+		var pn = null;
 
+		for (var i = 0; i < arguments.length; i++) {
+			var a = arguments[i];
+			if (typeof a === "number" && !Number.isNaN(a)) {
+				pn = a;
+				break;
+			}
+			if (typeof a === "string" && a !== "" && !Number.isNaN(Number(a))) {
+				pn = Number(a);
+				break;
+			}
+		}
+
+		if (pn == null) {
+			// fall back / safety
+			ui.addNotification(null, E("p", _("Missing partition number")));
+			return Promise.resolve();
+		}
+		return Promise.all([]).then(
+			L.bind(function (data) {
 				ui.showModal(
-					_("Reboot Device to an Alternative Partition") + " - " + _("Confirm"),
+					_("Reboot Device to Partition: %s").format(
+						String(pn).padStart(2, "0")
+					),
 					[
 						E(
 							"p",
 							_(
 								'WARNING: An alternative partition might have its own settings and completely different firmware.<br /><br />\
-				As your network configuration and WiFi SSID/password on alternative partition might be different,\
-					you might have to adjust your computer settings to be able to access your device once it reboots.<br /><br />\
-				Please also be aware that alternative partition firmware might not provide an easy way to switch active partition\
-					and boot back to the currently active partition.<br /><br />\
-				Click "Proceed" below to reboot device to an alternative partition.'
+As your network configuration and WiFi SSID/password on alternative partition might be different,\
+you might have to adjust your computer settings to be able to access your device once it reboots.<br /><br />\
+Please also be aware that alternative partition firmware might not provide an easy way to switch active partition\
+and boot back to the currently active partition.<br /><br />\
+Click "Proceed" below to reboot device to the selected partition.'
 							)
 						),
 						E("div", { class: "right" }, [
@@ -243,7 +269,32 @@ return view.extend({
 								"button",
 								{
 									class: "btn cbi-button cbi-button-positive important",
-									click: L.bind(this.handleTogglePartition, this),
+									click: L.bind(function () {
+										this.callBootPartition({ number: Number(pn) })
+											.then(
+												L.bind(function (res) {
+													ui.hideModal();
+													if (res && res.error) {
+														var fn = this.translateTable[res.error];
+														var a = Array.isArray(res.args) ? res.args : [];
+														if (res.detail) a = [res.detail].concat(a);
+
+														var msg =
+															typeof fn === "function"
+																? fn(a)
+																: _("Unexpected error: %s").format(
+																		String(res.error)
+																  );
+
+														return ui.addNotification(null, E("p", msg));
+													}
+													return this.handleReboot();
+												}, this)
+											)
+											.catch(function (e) {
+												ui.addNotification(null, E("p", e.message));
+											});
+									}, this),
 								},
 								_("Proceed")
 							),
@@ -274,17 +325,14 @@ return view.extend({
 						: "";
 
 				res.push([
-					(Number(partition.number || 0) + 0x100)
-						.toString(16)
-						.substr(-2)
-						.toUpperCase(),
+					String(Number(partition.number || 0)).padStart(2, "0"),
 					status,
 					fwLabel,
 					E(
 						"button",
 						{
 							class: "btn cbi-button cbi-button-apply important",
-							click: ui.createHandlerFn(this, func),
+							click: ui.createHandlerFn(this, func, Number(partition.number)),
 						},
 						text
 					),
@@ -362,10 +410,21 @@ return view.extend({
 				var err = device_info.error;
 				var fn = this.translateTable[err];
 				var args = [];
-				if (device_info.rom_board_name) args = [device_info.rom_board_name];
+				if (device_info.detail) args = [device_info.detail];
+				else if (device_info.rom_board_name)
+					args = [device_info.rom_board_name];
+
 				if (typeof fn === "function") {
 					body.appendChild(
 						E("p", { class: "alert-message warning" }, _("ERROR: ") + fn(args))
+					);
+				} else {
+					body.appendChild(
+						E(
+							"p",
+							{ class: "alert-message warning" },
+							_("ERROR: %s").format(err)
+						)
 					);
 				}
 			}

@@ -3,7 +3,7 @@
 		"description": "Grant file access for luci-app-advanced-reboot",
 		"read": {
 			"ubus": {
-				"luci.advanced-reboot": [ "obtain_device_info", "toggle_boot_partition" ],
+				"luci.advanced-reboot": [ "obtain_device_info", "boot_partition" ],
 				"system": [ "reboot" ]
 			},
 			"file": {
