@@ -307,11 +307,12 @@ Click "Proceed" below to reboot device to the selected partition.'
 
 	parsePartitions: function (partitions, activeNumber) {
 		var res = [];
-		var active = activeNumber != null ? String(activeNumber) : null;
+		var active = activeNumber != null ? String(Number(activeNumber)) : null;
 
 		(partitions || []).forEach(
 			L.bind(function (partition) {
-				var isActive = active != null && String(partition.number) === active;
+				var isActive =
+					active != null && String(Number(partition.number)) === active;
 				var func = isActive ? "handleReboot" : "handleAlternativeReboot";
 				var status = isActive ? _("Current") : _("Alternative");
 				var text = isActive
@@ -332,7 +333,11 @@ Click "Proceed" below to reboot device to the selected partition.'
 						"button",
 						{
 							class: "btn cbi-button cbi-button-apply important",
-							click: ui.createHandlerFn(this, func, Number(partition.number)),
+							click: ui.createHandlerFn(
+								this,
+								func,
+								String(Number(partition.number))
+							),
 						},
 						text
 					),
