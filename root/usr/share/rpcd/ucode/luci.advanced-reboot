@@ -8,7 +8,8 @@
  * Tests:
  * ubus -v list luci.advanced-reboot
  * ubus -S call luci.advanced-reboot obtain_device_info
- * ubus -S call luci.advanced-reboot boot_partition { "number": 1}
+ * ubus -S call luci.advanced-reboot boot_partition { "number": "1"}
+ * ubus -S call luci.advanced-reboot boot_partition { "number": "2"}
  *
  * Schema for device JSON files (new):
  * {
@@ -32,11 +33,11 @@
 
 'use strict';
 
-import { stat as stat, readfile as readfile, popen as popen, glob as glob, open as open } from 'fs';
+import * as fs from 'fs';
 let DEVICES_DIR = "/usr/share/advanced-reboot/devices/";
 
 function file_exists(p) {
-	try { return stat(p) != null; } catch (e) { return false; }
+	try { return fs.stat(p) != null; } catch (e) { return false; }
 }
 
 function str_trim(s) {
@@ -51,7 +52,7 @@ function shellquote(s) {
 }
 
 function command(cmd) {
-	return trim(popen(cmd)?.read?.('all'));
+	return trim(fs.popen(cmd)?.read?.('all'));
 }
 
 function log(msg) {
@@ -66,7 +67,7 @@ function has_cmd(name) {
 
 /* Read /tmp/sysinfo/board_name */
 function get_board_name() {
-	let s = readfile('/tmp/sysinfo/board_name');
+	let s = fs.readfile('/tmp/sysinfo/board_name');
 	if (!s) return null;
 	/* take the first line, drop trailing CR if present */
 	let line = split(s, "\n")[0] ?? "";
@@ -77,9 +78,9 @@ function get_board_name() {
 /* Find and return parsed device JSON object matching romBoardName */
 function find_device_info(romBoardName) {
 	let rb = str_trim(romBoardName ?? "");
-	let list = glob(DEVICES_DIR + "*.json");
+	let list = fs.glob(DEVICES_DIR + "*.json");
 	for (let f in list) {
-		let txt = readfile(f);
+		let txt = fs.readfile(f);
 		if (!txt) continue;
 		let obj = json(txt);
 		if (!obj || !obj.device) continue;
@@ -123,7 +124,7 @@ function get_volume_info(path) {
 
 	let kver = null;
 	if (root == '/') {
-		let pv = readfile('/proc/version');
+		let pv = fs.readfile('/proc/version');
 		if (pv) {
 			let m = match(pv, /^Linux version ([^ ]+)/);
 			if (m && m[1])
@@ -178,7 +179,7 @@ function alt_partition_unmount(op_ubi, ubi_vol) {
 	mtdCount = int(mtdCount) || 10;
 	command('umount /var/alt_rom');
 	for (let i = 0; i <= mtdCount; i++) {
-		let mtd = readfile('/sys/devices/virtual/ubi/ubi' + i + '/mtd_num');
+		let mtd = fs.readfile('/sys/devices/virtual/ubi/ubi' + i + '/mtd_num');
 		if (!mtd) break;
 		mtd = str_trim(mtd);
 		if (mtd == ("" + op_ubi)) {
@@ -247,16 +248,12 @@ function read_dual_flag_mtd() {
 function read_dual_flag_value(dev) {
 	if (!dev || dev == "" || !file_exists(dev))
 		return null;
-	let r = command('dd if=' + shellquote(dev) + ' bs=1 count=1 2>/dev/null | hexdump -n 1 -e \'' + '1/1 "%x"' + '\'');
-	log('Read DF MTD: ' + dev);
-	log('Read DF Value: ' + r);
+	let r = command('dd if=' + shellquote(dev) + ' bs=1 count=1 2>/dev/null | hexdump -n 1 -e \'' + '1/1 "%02x"' + '\'');
 	return r || null;
 }
 
 function write_dual_flag_value(dev, cur) {
 	cur = "\\x" + cur;
-	log('Write DF MTD: ' + dev);
-	log('Write DF Value: ' + cur);
 	let rc = command('printf %b ' + shellquote(cur) + ' > ' + shellquote(dev) + ' 2>/dev/null; echo $?');
 	return rc == "0";
 }
@@ -416,7 +413,7 @@ function boot_partition(req) {
 
 const methods = {
 	obtain_device_info: { call: obtain_device_info },
-	boot_partition: { args: { number: "Integer" }, call: boot_partition }
+	boot_partition: { args: { number: "String" }, call: boot_partition }
 };
 
 return { 'luci.advanced-reboot': methods };

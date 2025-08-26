@@ -2,7 +2,10 @@
 	"device": {
 		"vendor": "ZyXEL",
 		"model": "NBG6817",
-		"board": ["nbg6817","zyxel,nbg6817"]
+		"board": [
+			"nbg6817",
+			"zyxel,nbg6817"
+		]
 	},
 	"commands": {
 		"params": [],
@@ -13,13 +16,17 @@
 	"partitions": [
 		{
 			"number": 1,
-			"param_values": ["1"],
+			"param_values": [
+				"ff"
+			],
 			"mtd": "mmcblk0p4",
 			"labelOffsetBytes": 32
 		},
 		{
 			"number": 2,
-			"param_values": ["ff"],
+			"param_values": [
+				"01"
+			],
 			"mtd": "mmcblk0p7",
 			"labelOffsetBytes": 32
 		}
