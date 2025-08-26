@@ -13,13 +13,13 @@
 	"partitions": [
 		{
 			"number": 1,
-			"param_values": [1],
+			"param_values": ["1"],
 			"mtd": "mmcblk0p4",
 			"labelOffsetBytes": 32
 		},
 		{
 			"number": 2,
-			"param_values": [255],
+			"param_values": ["ff"],
 			"mtd": "mmcblk0p7",
 			"labelOffsetBytes": 32
 		}

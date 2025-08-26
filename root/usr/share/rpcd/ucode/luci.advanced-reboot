@@ -247,14 +247,13 @@ function read_dual_flag_mtd() {
 function read_dual_flag_value(dev) {
 	if (!dev || dev == "" || !file_exists(dev))
 		return null;
-	let r = command('dd if=' + shellquote(dev) + ' bs=1 count=1 2>/dev/null | hexdump -n 1 -e \'' + '1/1 "%d"' + '\'');
+	let r = command('dd if=' + shellquote(dev) + ' bs=1 count=1 2>/dev/null | hexdump -n 1 -e \'' + '1/1 "%x"' + '\'');
 	log('Read DF MTD: ' + dev);
 	log('Read DF Value: ' + r);
 	return r || null;
 }
 
 function write_dual_flag_value(dev, cur) {
-	cur = sprintf("%02X", cur);
 	cur = "\\x" + cur;
 	log('Write DF MTD: ' + dev);
 	log('Write DF Value: ' + cur);
@@ -410,7 +409,7 @@ function boot_partition(req) {
 		let df = read_dual_flag_mtd();
 		if (!df) return { error: 'NO_DUAL_FLAG', rom_board_name: board };
 		if (!file_exists(df)) return { error: 'NO_DUAL_FLAG_BLOCK', rom_board_name: board };
-		if (!write_dual_flag_value(df, int(target.param_values[0]))) return { error: 'ERR_SET_DUAL_FLAG', args: [ df ], rom_board_name: board };
+		if (!write_dual_flag_value(df, target.param_values[0])) return { error: 'ERR_SET_DUAL_FLAG', args: [ df ], rom_board_name: board };
 	}
 	return {};
 }
