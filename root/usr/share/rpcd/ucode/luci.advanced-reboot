@@ -362,13 +362,7 @@ function obtain_device_info() {
 		}
 		/* raw-label fallback if needed */
 		if (mtd && p.labelOffsetBytes != null) {
-			if (
-				!info ||
-				info.label == null ||
-				info.label == "" ||
-				info.os == null ||
-				info.os == ""
-			) {
+			if (!info?.label || !info?.os) {
 				let fb = get_partition_info_fallback(
 					mtd,
 					p.labelOffsetBytes,
@@ -409,7 +403,7 @@ function boot_partition(req) {
 	/* extract target partition number from RPC args */
 	let number = null;
 	if (req && req.args && req.args.number != null) number = int(req.args.number);
-	if (number == null || number != number)
+	if (!number)
 		return {
 			error: "INVALID_ARG",
 			detail: "number is required and must be numeric",
