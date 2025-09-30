@@ -65,7 +65,7 @@ function has_cmd(name) {
 
 /* Read /tmp/sysinfo/board_name */
 function get_board_name() {
-	let s = trim(fs.readfile("/tmp/sysinfo/board_name"));
+	return trim(fs.readfile("/tmp/sysinfo/board_name"));
 }
 
 /* Find and return parsed device JSON object matching romBoardName */
