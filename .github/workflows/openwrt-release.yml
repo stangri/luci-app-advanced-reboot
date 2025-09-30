@@ -77,7 +77,16 @@ jobs:
             --exclude='feed' \
             --exclude='.github' \
             ./ feed/luci/applications/${PKG_NAME}/
-
+      - name: 🧹 Consolidate devices JSON & prune folders
+        run: |
+          set -euo pipefail
+          DEV_DIR="feed/luci/applications/${PKG_NAME}/root/usr/share/advanced-reboot"
+          if [ -d "${DEV_DIR}/devices" ]; then
+            ( cd "${DEV_DIR}/devices" && jq -s '.' *.json > "${DEV_DIR}/devices.json" )
+            if [ -s "${DEV_DIR}/devices.json" ]; then
+              rm -rf "${DEV_DIR}/devices" "${DEV_DIR}/devices.disabled"
+            fi
+          fi
       - name: 🧮 Compute ARCH
         run: |
           if [ "${{ matrix.version }}" = "snapshots" ]; then
