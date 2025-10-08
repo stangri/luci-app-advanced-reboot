@@ -57,19 +57,34 @@ function log(msg) {
 	command("logger -t advanced-reboot -- " + shellquote("" + msg));
 }
 
-/* Quickly check if a command is present in PATH */
+/* Check whether an executable is available on PATH.
+ *
+ * @param {String} name  Program name (e.g., "ubus").
+ * @returns {Boolean} true if found (exit 0), false otherwise.
+ */
 function has_cmd(name) {
 	let r = command("command -v " + name + " >/dev/null 2>&1; echo $?");
 	return r == "0";
 }
 
-/* Read /tmp/sysinfo/board_name */
+/* Read the current board identifier.
+ *
+ * Source: /tmp/sysinfo/board_name produced by procd.
+ *
+ * @returns {String|null} Board name (e.g., "linksys,mx4200") or null if missing.
+ */
 function get_board_name() {
 	return trim(fs.readfile("/tmp/sysinfo/board_name"));
 }
 
-/* Find and return parsed device JSON object matching romBoardName */
-/* Parses devices.json or individual files thanks to @systemcrash */
+/* Locate the device descriptor matching a given board name.
+ *
+ * Tries the consolidated devices.json first, then falls back to per-file *.json
+ * in /usr/share/advanced-reboot/devices/.
+ *
+ * @param {String} romBoardName  Value from /tmp/sysinfo/board_name.
+ * @returns {Object|null} Device object with {device, commands, partitions} or null.
+ */
 function find_device_info(romBoardName) {
 	let rb = trim(romBoardName ?? "");
 
@@ -114,7 +129,11 @@ function find_device_info(romBoardName) {
 	return null;
 }
 
-/* Convert an mtd name like "mtd5" to its numeric index (5) */
+/* Convert an mtd name like "mtd5" to its numeric index (5).
+ *
+ * @param {String} mtdName
+ * @returns {Number|null} Parsed index or null for invalid input.
+ */
 function mtd_index(mtdName) {
 	let m = match("" + mtdName, /^mtd([0-9]+)/);
 	if (m && m[1]) {
@@ -124,7 +143,15 @@ function mtd_index(mtdName) {
 	return null;
 }
 
-/* Read OS label (and optionally kernel) from a given root path */
+/* Read OS label and (optionally) kernel version from a root path.
+ *
+ * Reads PRETTY_NAME from etc/os-release; normalizes snapshot labels using
+ * /etc/openwrt_release if present. When path=="/", also extracts kernel
+ * version from /proc/version (or uname -r).
+ *
+ * @param {String} path  Root of the filesystem to inspect ("/" or mount point).
+ * @returns {{label:String|null, os:String|null}}
+ */
 function get_volume_info(path) {
 	let root = path ?? "/";
 	/* ensure trailing slash exactly once */
@@ -161,12 +188,22 @@ function get_volume_info(path) {
 	return { label: label, os: kver };
 }
 
-/* Read current OS name from /etc/os-release, normalized for snapshot */
+/* Convenience wrapper to get volume info for the current rootfs.
+ *
+ * @returns {{label:String|null, os:String|null}}
+ */
 function get_partition_info_current() {
 	return get_volume_info("/");
 }
 
-/* Alt partition mount / unmount helpers */
+/* Determine if an alternate partition can be mounted.
+ *
+ * Requires: ubiattach, ubiblock, and mount commands available.
+ * Expects the `partitions` arg to be an array of mtd names (e.g., ["mtd5"]).
+ *
+ * @param {Array} partitions
+ * @returns {Boolean} true if tooling is present and input looks like mtd names.
+ */
 function is_alt_mountable(partitions) {
 	if (!partitions || type(partitions) != "array") return false;
 	for (let i = 0; i < length(partitions); i++) {
@@ -175,6 +212,15 @@ function is_alt_mountable(partitions) {
 	return has_cmd("ubiattach") && has_cmd("ubiblock") && has_cmd("mount");
 }
 
+/* Attach a UBI MTD device and mount an alternative root read-only.
+ *
+ * Mount point: /var/alt_rom
+ *
+ * @param {Number|String} op_ubi   UBI mtd index to attach (e.g., 6).
+ * @param {Number|String} ubi_vol  UBI volume index (default 0).
+ * @returns {Boolean} true if mounted successfully, false otherwise.
+ * @sideeffects  Creates/removes /var/alt_rom; calls ubiattach/ubiblock/mount.
+ */
 function alt_partition_mount(op_ubi, ubi_vol) {
 	log(
 		"attempting to mount alternative partition: UBI=" +
@@ -206,6 +252,15 @@ function alt_partition_mount(op_ubi, ubi_vol) {
 	return rc == "0";
 }
 
+/* Unmount and detach any UBI devices associated with a given MTD index.
+ *
+ * Also removes possible ubiblock nodes for the device.
+ *
+ * @param {Number|String} op_ubi   UBI mtd index previously attached.
+ * @param {Number|String} ubi_vol  UBI volume index (ignored during cleanup).
+ * @returns {void}
+ * @sideeffects  umounts /var/alt_rom, ubidetach, removes ubiblock nodes.
+ */
 function alt_partition_unmount(op_ubi, ubi_vol) {
 	let mtdCount = command(
 		'ubmtdCount | grep "Present UBI devices" | tr "," "\\n" | grep -c "ubi"'
@@ -228,6 +283,15 @@ function alt_partition_unmount(op_ubi, ubi_vol) {
 	}
 }
 
+/* Get label/OS info from an alternative partition, using UBI mount flow.
+ *
+ * Falls back to {label:null, os:null} if mount fails.
+ *
+ * @param {Number|String} op_ubi       UBI mtd index to attach.
+ * @param {String|null}   vendor_name  Vendor string (currently unused here).
+ * @param {Number|String} ubi_vol      UBI volume index (default 0).
+ * @returns {{label:String|null, os:String|null}}
+ */
 function get_partition_info_alt(op_ubi, vendor_name, ubi_vol) {
 	let info = null;
 	let mounted = alt_partition_mount(op_ubi, ubi_vol);
@@ -242,7 +306,16 @@ function get_partition_info_alt(op_ubi, vendor_name, ubi_vol) {
 	return { label: null, os: null };
 }
 
-/* Fallback: read label directly from MTD using dd pipeline */
+/* Fallback: probe an MTD partition directly for label/kernel hints.
+ *
+ * Uses `dd` to read bytes at labelOffset and inspects for OpenWrt/vendor tokens
+ * and kernel version strings.
+ *
+ * @param {String} mtd     MTD name (e.g., "mtd9").
+ * @param {Number} offset  Byte offset of label within the partition.
+ * @param {String|null} vendor  Vendor label to look for.
+ * @returns {{label:String|null, os:String|null}}
+ */
 function get_partition_info_fallback(mtd, offset, vendor) {
 	let label = null;
 	let os = null;
@@ -267,7 +340,6 @@ function get_partition_info_fallback(mtd, offset, vendor) {
 	return { label: label, os: os };
 }
 
-/* Dual-flag helpers (Zyxel path) */
 function read_dual_flag_mtd() {
 	for (let name in ["0:dual_flag", "0:DUAL_FLAG"]) {
 		let dev = command(". /lib/functions.sh; find_mtd_part " + shellquote(name));
@@ -276,6 +348,11 @@ function read_dual_flag_mtd() {
 	return null;
 }
 
+/* Read the single-byte dual-boot flag value from a block device.
+ *
+ * @param {String} dev  Path to the block (e.g., /dev/mtdX) returned by find_mtd_part.
+ * @returns {String|null} Lowercase hex byte (e.g., "00", "01") or null on error.
+ */
 function read_dual_flag_value(dev) {
 	if (!dev || dev == "" || !file_exists(dev)) return null;
 	let r = command(
@@ -288,6 +365,13 @@ function read_dual_flag_value(dev) {
 	return r || null;
 }
 
+/* Write a single-byte dual-boot flag value to a block device.
+ *
+ * @param {String} dev  Device path (e.g., /dev/mtdX).
+ * @param {String} cur  Hex byte without prefix (e.g., "01"); will be written as \\x01.
+ * @returns {Boolean} true if write succeeded, false otherwise.
+ * @sideeffects  Overwrites one byte on the target device.
+ */
 function write_dual_flag_value(dev, cur) {
 	cur = "\\x" + cur;
 	let rc = command(
@@ -300,7 +384,16 @@ function write_dual_flag_value(dev, cur) {
 	return rc == "0";
 }
 
-/* Obtain info: mirrors shell behavior */
+/* Gather device and partition information for UI/RPC.
+ *
+ * Detects active partition, attempts to label both current and alternate
+ * partitions via UBI mount (if supported) with a raw-label fallback.
+ *
+ * @returns {{
+ *   device:{vendor:String, model:String, board:String, partition_active:String|null},
+ *   partitions:Array<{number:String,label:String|null,os:String|null,mtd:String|null}>
+ * }} or {error:String,...} on failure.
+ */
 function obtain_device_info() {
 	let board = get_board_name();
 	if (!board) return { error: "NO_BOARD_NAME" };
@@ -399,6 +492,15 @@ function obtain_device_info() {
 	};
 }
 
+/* Switch active boot partition by updating bootloader env or dual-flag.
+ *
+ * Accepts ubus args: { "number": "<partition-number>" }.
+ * Uses the device schema to map partition numbers to env values or dual-flag bytes.
+ *
+ * @param {{args:{number:String|Number}}} req
+ * @returns {Object} {} on success; {error:..., ...} on failure.
+ * @sideeffects  Calls fw_setenv/fw_saveenv or writes to dual-flag MTD.
+ */
 function boot_partition(req) {
 	/* extract target partition number from RPC args */
 	let number = null;
