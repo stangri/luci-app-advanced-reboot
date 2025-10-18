@@ -8,8 +8,8 @@
  * Tests:
  * ubus -v list luci.advanced-reboot
  * ubus -S call luci.advanced-reboot obtain_device_info
- * ubus -S call luci.advanced-reboot boot_partition { "number": "1"}
- * ubus -S call luci.advanced-reboot boot_partition { "number": "2"}
+ * ubus -S call luci.advanced-reboot boot_partition '{ "number": "1" }'
+ * ubus -S call luci.advanced-reboot boot_partition '{ "number": "2" }'
  *
  * Schema for device JSON files (new):
  * {
