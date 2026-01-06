@@ -1,5 +1,5 @@
 /* luci.advanced-reboot.uc — ucode port of luci.advanced-reboot
- * Copyright 2025 MOSSDeF, Stan Grishin (stangri@melmac.ca)
+ * Copyright 2025-2026 MOSSDeF, Stan Grishin (stangri@melmac.ca)
  *
  * Exposes ubus object: luci.advanced-reboot
  * Methods:
@@ -114,9 +114,9 @@ function find_device_info(romBoardName) {
 	// Fallback: old schema with many small files
 	let list = fs.glob(DEVICES_DIR + "*.json");
 	for (let f in list) {
-		let txt = fs.readfile(f);
-		if (!txt) continue;
-		let obj = json(txt);
+		let ftxt = fs.readfile(f);
+		if (!ftxt) continue;
+		let obj = json(ftxt);
 		if (!obj || !obj.device) continue;
 		let boards = obj.device.board;
 		if (!boards) continue;
@@ -157,7 +157,7 @@ function get_volume_info(path) {
 	/* ensure trailing slash exactly once */
 	if (!match(root, /\/$/)) root = root + "/";
 
-	let label = null;
+	let label;
 	let pretty = command(
 		". " +
 		shellquote(root + "etc/os-release") +
@@ -185,7 +185,7 @@ function get_volume_info(path) {
 			if (r) kver = r;
 		}
 	}
-	return { label: label, os: kver };
+	return { label: label == "" ? null : label, os: kver };
 }
 
 /* Convenience wrapper to get volume info for the current rootfs.
@@ -263,7 +263,7 @@ function alt_partition_mount(op_ubi, ubi_vol) {
  */
 function alt_partition_unmount(op_ubi, ubi_vol) {
 	let mtdCount = command(
-		'ubmtdCount | grep "Present UBI devices" | tr "," "\\n" | grep -c "ubi"'
+		'ubinfo | grep "Present UBI devices" | tr "," "\\n" | grep -c "ubi"'
 	);
 	mtdCount = int(mtdCount) || 10;
 	command("umount /var/alt_rom");
@@ -293,11 +293,10 @@ function alt_partition_unmount(op_ubi, ubi_vol) {
  * @returns {{label:String|null, os:String|null}}
  */
 function get_partition_info_alt(op_ubi, vendor_name, ubi_vol) {
-	let info = null;
 	let mounted = alt_partition_mount(op_ubi, ubi_vol);
 	if (mounted) {
 		/* Read info from mounted alt root */
-		info = get_volume_info("/var/alt_rom/");
+		let info = get_volume_info("/var/alt_rom/");
 		alt_partition_unmount(op_ubi, ubi_vol);
 		return info ?? { label: null, os: null };
 	} else {
@@ -317,8 +316,8 @@ function get_partition_info_alt(op_ubi, vendor_name, ubi_vol) {
  * @returns {{label:String|null, os:String|null}}
  */
 function get_partition_info_fallback(mtd, offset, vendor) {
-	let label = null;
-	let os = null;
+	let label;
+	let os;
 	let tag = command("dd if=/dev/" + mtd + " bs=1 skip=" + offset + " count=64");
 	if (tag) {
 		let m1 = match(tag, /Linux version ([^ \n]+)/);
@@ -434,8 +433,8 @@ function obtain_device_info() {
 		let p = parts[i] ?? {};
 		let num = p.number != null ? p.number : i;
 		let mtd = p.mtd ?? null;
-		let info = null;
-		let v = null;
+		let info = {};
+		let v;
 
 		if ("" + curvals[0] == "" + p.param_values[0]) {
 			/* current partition */
@@ -450,7 +449,7 @@ function obtain_device_info() {
 			if (idx != null) {
 				let op_ubi = idx + mtdOff;
 				info = get_partition_info_alt(op_ubi, dev.vendor ?? null, ubiVol);
-				if (info && info.label == null && info.os == null) info = null;
+				if (info && info.label == null && info.os == null) info = {};
 			}
 		}
 		/* raw-label fallback if needed */
@@ -503,7 +502,7 @@ function obtain_device_info() {
  */
 function boot_partition(req) {
 	/* extract target partition number from RPC args */
-	let number = null;
+	let number;
 	if (req && req.number != null) number = int(req.number);
 	if (!number)
 		return {
