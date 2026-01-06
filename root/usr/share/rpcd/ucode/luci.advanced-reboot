@@ -160,15 +160,15 @@ function get_volume_info(path) {
 	let label = null;
 	let pretty = command(
 		". " +
-			shellquote(root + "etc/os-release") +
-			' 2>/dev/null; echo "$PRETTY_NAME" 2>/dev/null'
+		shellquote(root + "etc/os-release") +
+		' 2>/dev/null; echo "$PRETTY_NAME" 2>/dev/null'
 	);
 	if (pretty) label = trim(pretty);
 	if (label && match(label, /SNAPSHOT/)) {
 		let rel = command(
 			'grep -m1 "^DISTRIB_RELEASE=" ' +
-				shellquote(root + "etc/openwrt_release") +
-				" 2>/dev/null | awk -F= '{gsub(/[\"'']/, \"\", $2); print $2}'"
+			shellquote(root + "etc/openwrt_release") +
+			" 2>/dev/null | awk -F= '{gsub(/[\"'']/, \"\", $2); print $2}'"
 		);
 		if (rel) label = "OpenWrt " + trim(rel);
 	}
@@ -224,9 +224,9 @@ function is_alt_mountable(partitions) {
 function alt_partition_mount(op_ubi, ubi_vol) {
 	log(
 		"attempting to mount alternative partition: UBI=" +
-			op_ubi +
-			", Volume=" +
-			ubi_vol
+		op_ubi +
+		", Volume=" +
+		ubi_vol
 	);
 	log("ignore kernel messages below");
 	command("mkdir -p /var/alt_rom");
@@ -234,8 +234,8 @@ function alt_partition_mount(op_ubi, ubi_vol) {
 	command("ubidetach -m " + op_ubi + " >/dev/null 2>&1");
 	let out = command(
 		"ubiattach -m " +
-			op_ubi +
-			" 2>/dev/null | sed -n 's/^UBI device number\\s*\\([0-9]*\\),.*$/\\1/p'"
+		op_ubi +
+		" 2>/dev/null | sed -n 's/^UBI device number\\s*\\([0-9]*\\),.*$/\\1/p'"
 	);
 	log("mounted alternative partition UBI device number: " + out);
 	let dev = out && length(out) ? int(out) : null;
@@ -357,10 +357,10 @@ function read_dual_flag_value(dev) {
 	if (!dev || dev == "" || !file_exists(dev)) return null;
 	let r = command(
 		"dd if=" +
-			shellquote(dev) +
-			" bs=1 count=1 2>/dev/null | hexdump -n 1 -e '" +
-			'1/1 "%02x"' +
-			"'"
+		shellquote(dev) +
+		" bs=1 count=1 2>/dev/null | hexdump -n 1 -e '" +
+		'1/1 "%02x"' +
+		"'"
 	);
 	return r || null;
 }
@@ -376,10 +376,10 @@ function write_dual_flag_value(dev, cur) {
 	cur = "\\x" + cur;
 	let rc = command(
 		"printf %b " +
-			shellquote(cur) +
-			" > " +
-			shellquote(dev) +
-			" 2>/dev/null; echo $?"
+		shellquote(cur) +
+		" > " +
+		shellquote(dev) +
+		" 2>/dev/null; echo $?"
 	);
 	return rc == "0";
 }
@@ -504,7 +504,7 @@ function obtain_device_info() {
 function boot_partition(req) {
 	/* extract target partition number from RPC args */
 	let number = null;
-	if (req && req.args && req.args.number != null) number = int(req.args.number);
+	if (req && req.number != null) number = int(req.number);
 	if (!number)
 		return {
 			error: "INVALID_ARG",
@@ -545,11 +545,11 @@ function boot_partition(req) {
 			if (value == null) continue;
 			let rc = command(
 				setcmd +
-					" " +
-					shellquote(param) +
-					" " +
-					shellquote("" + value) +
-					" 2>/dev/null; echo $?"
+				" " +
+				shellquote(param) +
+				" " +
+				shellquote("" + value) +
+				" 2>/dev/null; echo $?"
 			);
 			if (rc != "0")
 				return {
