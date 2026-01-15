@@ -495,7 +495,9 @@ function obtain_device_info() {
 function boot_partition(req) {
 	/* extract target partition number from RPC args */
 	let number;
-	let val = req && req.number;
+	let val;
+	if (type(req) == "object" && req.number) val = req.number;
+
 	if (val != null) val = "" + val;
 	if (val != null && match(val, /^[0-9]+$/))
 		number = int(val);
@@ -503,7 +505,7 @@ function boot_partition(req) {
 	if (number == null)
 		return {
 			error: "INVALID_ARG",
-			detail: "number is required and must be numeric",
+			detail: "number is required and must be numeric (got: " + json(req) + ")",
 		};
 
 	let board = get_board_name();

@@ -85,7 +85,6 @@ return view.extend({
 	callBootPartition: rpc.declare({
 		object: "luci.advanced-reboot",
 		method: "boot_partition",
-		params: ["number"],
 		expect: {},
 	}),
 
@@ -259,7 +258,7 @@ return view.extend({
 								{
 									class: "btn cbi-button cbi-button-positive important",
 									click: L.bind(function () {
-										this.callBootPartition(String(pn))
+										this.callBootPartition({ number: String(pn) })
 											.then(
 												L.bind(function (res) {
 													ui.hideModal();
