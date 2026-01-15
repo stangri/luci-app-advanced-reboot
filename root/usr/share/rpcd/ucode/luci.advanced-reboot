@@ -161,17 +161,9 @@ function get_volume_info(path) {
 	let pretty = command(
 		". " +
 		shellquote(root + "etc/os-release") +
-		' 2>/dev/null; echo "$PRETTY_NAME" 2>/dev/null'
+		' 2>/dev/null; echo "$OPENWRT_RELEASE" 2>/dev/null'
 	);
 	if (pretty) label = trim(pretty);
-	if (label && match(label, /SNAPSHOT/)) {
-		let rel = command(
-			'grep -m1 "^DISTRIB_RELEASE=" ' +
-			shellquote(root + "etc/openwrt_release") +
-			" 2>/dev/null | awk -F= '{gsub(/[\"'']/, \"\", $2); print $2}'"
-		);
-		if (rel) label = "OpenWrt " + trim(rel);
-	}
 
 	let kver = null;
 	if (root == "/") {
@@ -496,15 +488,19 @@ function obtain_device_info() {
  * Accepts ubus args: { "number": "<partition-number>" }.
  * Uses the device schema to map partition numbers to env values or dual-flag bytes.
  *
- * @param {{args:{number:String|Number}}} req
+ * @param {{number:String}} req
  * @returns {Object} {} on success; {error:..., ...} on failure.
  * @sideeffects  Calls fw_setenv/fw_saveenv or writes to dual-flag MTD.
  */
 function boot_partition(req) {
 	/* extract target partition number from RPC args */
 	let number;
-	if (req && req.number != null) number = int(req.number);
-	if (!number)
+	let val = req && req.number;
+	if (val != null) val = "" + val;
+	if (val != null && match(val, /^[0-9]+$/))
+		number = int(val);
+
+	if (number == null)
 		return {
 			error: "INVALID_ARG",
 			detail: "number is required and must be numeric",
