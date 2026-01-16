@@ -496,7 +496,6 @@ function boot_partition(req) {
 	/* extract target partition number from RPC args */
 	let number;
 	let val;
-	/* if (type(req) == "object" && req.number) val = req.number; */
 
 	if (type(req?.args) == "object") {
 		val = req.args.number;
