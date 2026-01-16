@@ -493,15 +493,17 @@ function obtain_device_info() {
  * @sideeffects  Calls fw_setenv/fw_saveenv or writes to dual-flag MTD.
  */
 function boot_partition(req) {
+	log("boot_partition req=" + json(req));
 	/* extract target partition number from RPC args */
 	let number;
 	let val;
 
-	if (type(req?.args) == "object") {
+	if (type(req) == "array" && length(req) > 0)
+		val = req[0]?.number;
+	else if (type(req?.args) == "object")
 		val = req.args.number;
-	} else if (type(req) == "object") {
+	else if (type(req) == "object")
 		val = req.number;
-	}
 
 	if (val != null) val = "" + val;
 	if (val != null && match(val, /^[0-9]+$/))
@@ -543,23 +545,32 @@ function boot_partition(req) {
 		for (let j = 0; j < length(params); j++) {
 			let param = params[j];
 			let value = target.param_values ? target.param_values[j] : null;
+			let rc = "0";
+
 			if (param == null || param == "") continue;
 			if (value == null) continue;
-			let rc = command(
-				setcmd +
-				" " +
-				shellquote(param) +
-				" " +
-				shellquote("" + value) +
-				" 2>/dev/null; echo $?"
-			);
-			if (rc != "0")
-				return {
-					error: "ERR_SET_ENV",
-					args: [param, "" + value],
-					rom_board_name: board,
-				};
-			if (savecmd) rc = command(savecmd + " 2>/dev/null; echo $?");
+
+			if (setcmd) {
+				let cmd = setcmd +
+					" " +
+					shellquote(param) +
+					" " +
+					shellquote("" + value) +
+					" 2>/dev/null; echo $?";
+				log("boot_partition running: " + cmd);
+				rc = command(cmd);
+				if (rc != "0")
+					return {
+						error: "ERR_SET_ENV",
+						args: [param, "" + value],
+						rom_board_name: board,
+					};
+			}
+			if (savecmd) {
+				let cmd = savecmd + " 2>/dev/null; echo $?";
+				log("boot_partition running: " + cmd);
+				rc = command(cmd);
+			}
 			if (rc != "0") return { error: "ERR_SAVE_ENV", rom_board_name: board };
 		}
 	} else {
@@ -567,6 +578,9 @@ function boot_partition(req) {
 		if (!df) return { error: "NO_DUAL_FLAG", rom_board_name: board };
 		if (!file_exists(df))
 			return { error: "NO_DUAL_FLAG_BLOCK", rom_board_name: board };
+
+		log("boot_partition setting dual flag: " + df + " to " + target.param_values[0]);
+
 		if (!write_dual_flag_value(df, target.param_values[0]))
 			return { error: "ERR_SET_DUAL_FLAG", args: [df], rom_board_name: board };
 	}
