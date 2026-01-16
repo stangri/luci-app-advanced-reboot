@@ -7,7 +7,7 @@ PKG_NAME:=luci-app-advanced-reboot
 PKG_LICENSE:=AGPL-3.0-or-later
 PKG_MAINTAINER:=Stan Grishin <stangri@melmac.ca>
 PKG_VERSION:=1.1.1
-PKG_RELEASE:=11
+PKG_RELEASE:=12
 
 PKG_BUILD_DEPENDS:=jq/host
 
