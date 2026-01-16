@@ -502,7 +502,7 @@ function boot_partition(req) {
 		val = req.args.number;
 	} else if (type(req) == "object") {
 		val = req.number;
-    }
+	}
 
 	if (val != null) val = "" + val;
 	if (val != null && match(val, /^[0-9]+$/))
