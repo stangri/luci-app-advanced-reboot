@@ -259,7 +259,7 @@ return view.extend({
 								{
 									class: "btn cbi-button cbi-button-positive important",
 									click: L.bind(function () {
-										this.callBootPartition({ number: String(pn) })
+										this.callBootPartition(String(pn))
 											.then(
 												L.bind(function (res) {
 													ui.hideModal();
