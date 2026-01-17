@@ -85,6 +85,7 @@ return view.extend({
 	callBootPartition: rpc.declare({
 		object: "luci.advanced-reboot",
 		method: "boot_partition",
+		params: ["number"],
 		expect: {},
 	}),
 

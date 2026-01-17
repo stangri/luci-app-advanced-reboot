@@ -493,7 +493,7 @@ function obtain_device_info() {
  * @sideeffects  Calls fw_setenv/fw_saveenv or writes to dual-flag MTD.
  */
 function boot_partition(req) {
-	log("boot_partition req=" + json(req));
+	log("boot_partition req=" + sprintf("%J", req?.args));
 	/* extract target partition number from RPC args */
 	let number;
 	let val;
@@ -512,7 +512,7 @@ function boot_partition(req) {
 	if (number == null)
 		return {
 			error: "INVALID_ARG",
-			detail: "number is required and must be numeric (got: " + json(req) + ")",
+			detail: "number is required and must be numeric (got: " + sprintf("%J", req?.args) + ")",
 		};
 
 	let board = get_board_name();
