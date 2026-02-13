@@ -12,7 +12,7 @@ PKG_RELEASE:=15
 PKG_BUILD_DEPENDS:=jq/host
 
 LUCI_TITLE:=Advanced Linksys Reboot Web UI
-LUCI_URL:=https://github.com/stangri/luci-app-advanced-reboot/
+LUCI_URL:=https://github.com/mossdef-org/luci-app-advanced-reboot/
 LUCI_DESCRIPTION:=Provides Web UI (found under System/Advanced Reboot) to reboot supported Linksys and ZyXEL routers to\
 	an alternative partition. Also provides Web UI to shut down (power off) your device. 	Supported dual-partition\
 	routers are listed at https://docs.openwrt.melmac.ca/luci-app-advanced-reboot/
