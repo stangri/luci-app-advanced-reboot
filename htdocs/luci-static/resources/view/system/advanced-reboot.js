@@ -65,6 +65,11 @@ return view.extend({
 		ERR_SAVE_ENV: function (args) {
 			return _("Unable to save environment changes.");
 		},
+		ERR_SET_HELPER: function (args) {
+			return _(
+				"Unable to run device helper: %s for partition: %s."
+			).format(args[0], args[1]);
+		},
 		NO_TARGET_FLAG: function (args) {
 			return _("Target partition flag is not defined for this device.");
 		},

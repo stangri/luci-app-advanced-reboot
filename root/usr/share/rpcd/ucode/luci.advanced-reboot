@@ -18,7 +18,8 @@
  * 		"params": ["<env1>", "<env2>"],
  * 		"get": "fw_printenv",
  * 		"set": "fw_setenv",
- * 		"save": null
+ * 		"save": null,
+ * 		"set_helper": "/usr/share/advanced-reboot/helpers/<device>.sh"
  * 	},
  * 	"partitions": [
  * 		{ "number": 1, "param_values": [v1, w1], "mtd": "mtdX", "labelOffsetBytes": <int|null>, "altMountOptions": { "mtdOffset": <int>, "ubiVolume": <int> } },
@@ -29,6 +30,8 @@
  * Notes:
  * - `altMountOptions` is optional; when absent, defaults are mtdOffset=1, ubiVolume=0.
  * - `param_values[i]` aligns with `commands.params[i]`.
+ * - `set_helper` is optional; when present, the script is called with the partition
+ *   number as its sole argument after the standard params have been set.
  */
 
 "use strict";
@@ -572,6 +575,22 @@ function boot_partition(req) {
 				rc = command(cmd);
 			}
 			if (rc != "0") return { error: "ERR_SAVE_ENV", rom_board_name: board };
+		}
+
+		/* Run device-specific helper if defined */
+		let helper = cmds.set_helper;
+		if (helper && helper != "") {
+			let cmd = shellquote(helper) +
+				" " + shellquote("" + number) +
+				" 2>/dev/null; echo $?";
+			log("boot_partition running helper: " + cmd);
+			let rc = command(cmd);
+			if (rc != "0")
+				return {
+					error: "ERR_SET_HELPER",
+					args: [helper, "" + number],
+					rom_board_name: board,
+				};
 		}
 	} else {
 		let df = read_dual_flag_mtd();

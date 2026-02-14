@@ -16,6 +16,7 @@
 				"/bin/uname": [ "list", "exec" ],
 				"/etc/os-release": [ "read" ],
 				"/lib/functions.sh": [ "read" ],
+				"/lib/upgrade/platform.sh": [ "read" ],
 				"/proc/mounts": [ "read" ],
 				"/proc/version": [ "read" ],
 				"/sbin/poweroff": [ "list", "exec" ],
@@ -28,6 +29,7 @@
 				"/usr/sbin/fw_printsys": [ "list", "exec" ],
 				"/usr/sbin/fw_setenv": [ "list", "exec" ],
 				"/usr/sbin/fw_setsys": [ "list", "exec" ],
+				"/usr/share/advanced-reboot/helpers/*": [ "list", "exec", "read" ],
 				"/usr/sbin/ubiblock": [ "list", "exec" ],
 				"/usr/sbin/ubiattach": [ "list", "exec" ],
 				"/usr/sbin/ubidetach": [ "list", "exec" ]
