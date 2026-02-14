@@ -2,10 +2,15 @@
 	"device": {
 		"vendor": "Linksys",
 		"model": "EA7500v3",
-		"board": ["linksys,ea7500-v3"]
+		"board": [
+			"linksys,ea7500-v3"
+		]
 	},
 	"commands": {
-		"params": ["boot_part", "bootimage"],
+		"params": [
+			"boot_part",
+			"bootimage"
+		],
 		"get": "fw_printenv",
 		"set": "fw_setenv",
 		"save": null
@@ -13,15 +18,27 @@
 	"partitions": [
 		{
 			"number": 1,
-			"param_values": [1, 1],
-			"mtd": "mtd3",
-			"labelOffsetBytes": 32
+			"param_values": [
+				1,
+				1
+			],
+			"firmware": {
+				"kernel": "mtd3",
+				"kernel_label_offset": 32,
+				"rootfs": "mtd4"
+			}
 		},
 		{
 			"number": 2,
-			"param_values": [2, 2],
-			"mtd": "mtd5",
-			"labelOffsetBytes": 32
+			"param_values": [
+				2,
+				2
+			],
+			"firmware": {
+				"kernel": "mtd5",
+				"kernel_label_offset": 32,
+				"rootfs": "mtd6"
+			}
 		}
 	]
 }
