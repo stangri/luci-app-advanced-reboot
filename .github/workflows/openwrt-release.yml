@@ -6,12 +6,49 @@ on:
   push:
     branches:
       - main
+  pull_request:
   workflow_dispatch:
 
 jobs:
+  test:
+    name: Functional tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install ucode build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake pkg-config libjson-c-dev jq
+
+      - name: Build and install ucode
+        run: |
+          git clone --depth 1 https://github.com/jow-/ucode.git /tmp/ucode
+          cmake -S /tmp/ucode -B /tmp/ucode/build \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DFS_SUPPORT=ON \
+            -DUCI_SUPPORT=OFF \
+            -DUBUS_SUPPORT=OFF \
+            -DULOOP_SUPPORT=OFF \
+            -DNLS_SUPPORT=OFF \
+            -DRTNL_SUPPORT=OFF
+          cmake --build /tmp/ucode/build -j$(nproc)
+          sudo cmake --install /tmp/ucode/build
+          sudo ldconfig
+
+      - name: Verify ucode
+        run: ucode -e 'import { readfile } from "fs"; print("ucode ok\n");'
+
+      - name: Run functional tests
+        run: bash tests/run_tests.sh
+
   build:
     name: Build for ${{ matrix.version }} / ${{ matrix.target }}
+    needs: test
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     env:
       REPO_APK_KEY: ${{ secrets.REPO_APK_KEY }}
 
